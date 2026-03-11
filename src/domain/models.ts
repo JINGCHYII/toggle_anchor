@@ -26,11 +26,3 @@ export interface DentalArch {
   innerCenter: ArchPoint;
   anchors: Anchor[];
 }
-
-export interface ScoreBreakdown {
-  cohesion: number;
-  compactness: number;
-  collision: number;
-  balance: number;
-  total: number;
-}
