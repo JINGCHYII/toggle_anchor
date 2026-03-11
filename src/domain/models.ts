@@ -13,9 +13,16 @@ export interface Anchor {
   bars: Record<BarType, ScanBar>;
 }
 
+export interface ArchPoint {
+  x: number;
+  y: number;
+}
+
 export interface DentalArch {
   width: number;
   height: number;
+  contour: ArchPoint[];
+  innerCenter: ArchPoint;
   anchors: Anchor[];
 }
 

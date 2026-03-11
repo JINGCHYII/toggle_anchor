@@ -35,6 +35,17 @@ body {
   stroke-width: 6;
 }
 
+.inner-center {
+  fill: #ff8b4f;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.inner-center-label {
+  fill: #c0561e;
+  font-size: 12px;
+}
+
 .anchor {
   fill: #bfc8e8;
   stroke: #4f5da3;
@@ -54,6 +65,7 @@ label {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
