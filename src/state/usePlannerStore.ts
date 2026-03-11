@@ -15,6 +15,7 @@ interface PlannerState {
   rerollArch: () => void;
   setBarLength: (type: BarType, length: number) => void;
   addAnchor: () => void;
+  addAnchorAtPoint: (x: number, y: number) => void;
   removeAnchor: (id: string) => void;
   selectAnchor: (id: string) => void;
   placeBar: (anchorId: string, type: BarType) => void;
@@ -27,13 +28,14 @@ const makeAnchor = (
   fallbackHeight: number,
   barLengths: Record<BarType, number>,
   contour: ArchPoint[],
-  innerCenter: ArchPoint
+  innerCenter: ArchPoint,
+  fixedPoint?: ArchPoint
 ): Anchor => {
   const contourIndex = Math.max(0, Math.min(contour.length - 1, Math.round((id / 7) * contour.length)));
   const curvePoint = contour[contourIndex];
 
-  const x = curvePoint?.x ?? 120 + (id * 53) % (fallbackWidth - 240);
-  const y = curvePoint ? curvePoint.y + 44 : 90 + (id * 31) % (fallbackHeight - 160);
+  const x = fixedPoint?.x ?? curvePoint?.x ?? 120 + (id * 53) % (fallbackWidth - 240);
+  const y = fixedPoint?.y ?? (curvePoint ? curvePoint.y + 44 : 90 + (id * 31) % (fallbackHeight - 160));
   const placementAngle = getPlacementAngle({ x, y }, innerCenter);
 
   return {
@@ -49,9 +51,9 @@ const makeAnchor = (
 };
 
 const initialBarLengths: Record<BarType, number> = {
-  short: 8,
-  medium: 12,
-  long: 16
+  short: 12,
+  medium: 17,
+  long: 23
 };
 
 const buildArch = (
@@ -119,6 +121,24 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         state.barLengths,
         state.arch.contour,
         state.arch.innerCenter
+      );
+      const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
+      return { arch, selectedAnchorId: newAnchor.id, score: scoreTotal(arch) };
+    }),
+  addAnchorAtPoint: (x, y) =>
+    set((state) => {
+      const nextId = state.arch.anchors.length + 1;
+      const newAnchor = makeAnchor(
+        nextId,
+        state.arch.width,
+        state.arch.height,
+        state.barLengths,
+        state.arch.contour,
+        state.arch.innerCenter,
+        {
+          x: Math.max(0, Math.min(state.arch.width, x)),
+          y: Math.max(0, Math.min(state.arch.height, y))
+        }
       );
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
       return { arch, selectedAnchorId: newAnchor.id, score: scoreTotal(arch) };

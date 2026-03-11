@@ -47,6 +47,10 @@ body {
   font-size: 12px;
 }
 
+.anchor-group {
+  cursor: pointer;
+}
+
 .anchor {
   fill: #bfc8e8;
   stroke: #4f5da3;
@@ -127,4 +131,10 @@ button:disabled {
   margin-top: 12px;
   font-size: 1.2rem;
   font-weight: 700;
+}
+
+.tips {
+  margin-top: 12px;
+  color: #4a5575;
+  font-size: 13px;
 }
