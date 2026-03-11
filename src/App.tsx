@@ -1,4 +1,4 @@
-import { useState, type PointerEventHandler } from 'react';
+import { useState, type PointerEventHandler, type MouseEventHandler } from 'react';
 import { usePlannerStore } from './state/usePlannerStore';
 import { BAR_TYPES, getDragAngle } from './domain/placement';
 import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
@@ -23,6 +23,7 @@ function App() {
     rerollArch,
     setBarLength,
     addAnchor,
+    addAnchorAtPoint,
     removeAnchor,
     selectAnchor,
     placeBar,
@@ -34,19 +35,36 @@ function App() {
   const archPath = toArchPath(arch.contour);
   const innerCenter = arch.innerCenter.x === 0 && arch.innerCenter.y === 0 ? calcInnerCenterFromPoints(arch.contour) : arch.innerCenter;
 
+  const mapEventToCanvas = (event: { clientX: number; clientY: number }, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * arch.width,
+      y: ((event.clientY - rect.top) / rect.height) * arch.height
+    };
+  };
+
   const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
     if (!dragging) {
       return;
     }
-    const svg = event.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * arch.width;
-    const y = ((event.clientY - rect.top) / rect.height) * arch.height;
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
     const anchor = arch.anchors.find((item) => item.id === dragging.anchorId);
     if (!anchor) {
       return;
     }
     setBarAngle(anchor.id, dragging.type, getDragAngle(anchor, { x, y }));
+  };
+
+  const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
+    if (dragging) {
+      return;
+    }
+    const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
+    if (clickedAnchor) {
+      return;
+    }
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
+    addAnchorAtPoint(x, y);
   };
 
   return (
@@ -58,6 +76,7 @@ function App() {
           className="arch-canvas"
           role="img"
           aria-label="dental arch canvas"
+          onClick={handleCanvasClick}
           onPointerMove={handlePointerMove}
           onPointerUp={() => setDragging(null)}
           onPointerLeave={() => setDragging(null)}
@@ -91,7 +110,19 @@ function App() {
                   />
                 );
               })}
-              <g key={anchor.id} onClick={() => selectAnchor(anchor.id)} className="anchor-group">
+              <g
+                key={anchor.id}
+                data-anchor-id={anchor.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  selectAnchor(anchor.id);
+                }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  removeAnchor(anchor.id);
+                }}
+                className="anchor-group"
+              >
                 <circle
                   cx={anchor.x}
                   cy={anchor.y}
@@ -154,6 +185,7 @@ function App() {
             删除选中 Anchor
           </button>
         </div>
+        <p className="tips">点击曲线或画布可添加点；双击已添加点可删除。</p>
       </section>
 
       <section className="panel score-panel">
