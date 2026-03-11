@@ -27,6 +27,7 @@ body {
   height: 360px;
   background: linear-gradient(#fdfdff, #eff4ff);
   border-radius: 10px;
+  touch-action: none;
 }
 
 .arch-path {
@@ -57,6 +58,30 @@ body {
   fill: #5f7dff;
 }
 
+.bar {
+  fill: rgba(73, 94, 196, 0.45);
+  stroke: #31418c;
+  stroke-width: 1.5;
+  cursor: grab;
+  rx: 2;
+}
+
+.bar:active {
+  cursor: grabbing;
+}
+
+.bar-short {
+  fill: rgba(90, 176, 255, 0.45);
+}
+
+.bar-medium {
+  fill: rgba(102, 147, 255, 0.45);
+}
+
+.bar-long {
+  fill: rgba(112, 108, 255, 0.5);
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -67,6 +92,10 @@ label {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.place-actions {
+  margin-bottom: 12px;
 }
 
 button {
