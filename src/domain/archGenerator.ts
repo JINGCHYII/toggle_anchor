@@ -100,22 +100,35 @@ export const generateArchCurve = ({
   width,
   height,
   seed,
-  segmentCount = 60,
-  coefficients
+  segmentCount = 60
 }: GenerateArchOptions): ArchCurve => {
+  const rng = createSeededRng(seed);
+  const centerX = width / 2;
   const baseY = height - 52;
-  const depthToCanvasY = (height * 0.55) / MAX_DEPTH_MM;
-  const usedCoefficients = coefficients ?? randomCoefficients(seed);
+
+  // y = ax^3 + bx^2 + cx + d, x in [-30, 30]mm, y in [0, 40]mm
+  const cubicA = 0.00005 + rng() * (0.0003 - 0.00005);
+  const cubicB = 0.01 + rng() * (0.02 - 0.01);
+  const cubicC = (rng() - 0.5) * 0.001;
+  const cubicD = (rng() - 0.5) * 0.5;
+
+  const xRangeMm = 60;
+  const maxDepthMm = 40;
+  const mmToCanvasX = width / xRangeMm;
+  const mmToCanvasY = (height * 0.55) / maxDepthMm;
 
   const curvePoints: ArchPoint[] = [];
   for (let i = 0; i <= segmentCount; i += 1) {
     const t = i / segmentCount;
-    const xMm = X_MIN_MM + t * (X_MAX_MM - X_MIN_MM);
-    const depthMm = evaluateCubicDepthMm(usedCoefficients, xMm);
+    const xMm = -30 + t * xRangeMm;
+    const rawDepthMm = cubicA * xMm ** 3 + cubicB * xMm ** 2 + cubicC * xMm + cubicD;
+    const depthMm = Math.max(0, Math.min(maxDepthMm, rawDepthMm));
+    const baseX = centerX + xMm * mmToCanvasX;
+    const basePointY = baseY - depthMm * mmToCanvasY;
 
     curvePoints.push({
-      x: mmXToCanvasX(xMm, width),
-      y: baseY - depthMm * depthToCanvasY
+      x: baseX,
+      y: basePointY
     });
   }
 

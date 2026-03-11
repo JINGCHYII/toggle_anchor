@@ -1,5 +1,5 @@
-import { useState, type MouseEventHandler, type PointerEventHandler } from 'react';
-import { CUBIC_RANGES } from './domain/archGenerator';
+import { useState, type PointerEventHandler, type MouseEventHandler } from 'react';
+import { usePlannerStore } from './state/usePlannerStore';
 import { BAR_TYPES, getDragAngle } from './domain/placement';
 import type { Anchor, BarType } from './domain/models';
 import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
@@ -27,7 +27,6 @@ function App() {
     setCubicCoefficient,
     addAnchor,
     addAnchorAtPoint,
-    moveAnchorOnCurve,
     removeAnchor,
     selectAnchor,
     placeBar,
@@ -49,6 +48,14 @@ function App() {
     };
   };
 
+  const mapEventToCanvas = (event: { clientX: number; clientY: number }, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * arch.width,
+      y: ((event.clientY - rect.top) / rect.height) * arch.height
+    };
+  };
+
   const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
     const { x, y } = mapEventToCanvas(event, event.currentTarget);
 
@@ -60,14 +67,9 @@ function App() {
       setBarAngle(anchor.id, draggingBar.type, getDragAngle(anchor, { x, y }));
       return;
     }
-
-    if (draggingAnchorId) {
-      moveAnchorOnCurve(draggingAnchorId, x, y);
-    }
-  };
-
-  const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
-    if (draggingBar || draggingAnchorId) {
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
+    const anchor = arch.anchors.find((item) => item.id === dragging.anchorId);
+    if (!anchor) {
       return;
     }
     const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
@@ -81,6 +83,18 @@ function App() {
   const stopDragging = () => {
     setDraggingBar(null);
     setDraggingAnchorId(null);
+  };
+
+  const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
+    if (dragging) {
+      return;
+    }
+    const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
+    if (clickedAnchor) {
+      return;
+    }
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
+    addAnchorAtPoint(x, y);
   };
 
   return (
@@ -127,11 +141,8 @@ function App() {
                 );
               })}
               <g
+                key={anchor.id}
                 data-anchor-id={anchor.id}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  setDraggingAnchorId(anchor.id);
-                }}
                 onClick={(event) => {
                   event.stopPropagation();
                   selectAnchor(anchor.id);
@@ -225,7 +236,7 @@ function App() {
             删除选中 Anchor
           </button>
         </div>
-        <p className="tips">默认不生成点。点击曲线添加点；按住点可沿曲线拖拽；双击点删除。</p>
+        <p className="tips">点击曲线或画布可添加点；双击已添加点可删除。</p>
       </section>
 
       <section className="panel score-panel">

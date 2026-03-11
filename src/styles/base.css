@@ -48,7 +48,7 @@ body {
 }
 
 .anchor-group {
-  cursor: grab;
+  cursor: pointer;
 }
 
 .anchor {

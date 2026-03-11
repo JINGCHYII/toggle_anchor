@@ -23,7 +23,6 @@ interface PlannerState {
   setCubicCoefficient: (type: keyof CubicCoefficients, value: number) => void;
   addAnchor: () => void;
   addAnchorAtPoint: (x: number, y: number) => void;
-  moveAnchorOnCurve: (id: string, x: number, y: number) => void;
   removeAnchor: (id: string) => void;
   selectAnchor: (id: string) => void;
   placeBar: (anchorId: string, type: BarType) => void;
@@ -179,7 +178,6 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   addAnchorAtPoint: (x, y) =>
     set((state) => {
       const nextId = state.arch.anchors.length + 1;
-      const snapped = closestPointOnCurve(state.arch.contour, x, y);
       const newAnchor = makeAnchor(
         nextId,
         state.arch.width,
@@ -187,34 +185,13 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         state.barLengths,
         state.arch.contour,
         state.arch.innerCenter,
-        snapped
+        {
+          x: Math.max(0, Math.min(state.arch.width, x)),
+          y: Math.max(0, Math.min(state.arch.height, y))
+        }
       );
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
       return { arch, selectedAnchorId: newAnchor.id, score: scoreTotal(arch) };
-    }),
-  moveAnchorOnCurve: (id, x, y) =>
-    set((state) => {
-      const snapped = closestPointOnCurve(state.arch.contour, x, y);
-      const arch = {
-        ...state.arch,
-        anchors: state.arch.anchors.map((anchor) => {
-          if (anchor.id !== id) {
-            return anchor;
-          }
-          const angle = getPlacementAngle(snapped, state.arch.innerCenter);
-          return {
-            ...anchor,
-            x: snapped.x,
-            y: snapped.y,
-            bars: {
-              short: { ...anchor.bars.short, angle },
-              medium: { ...anchor.bars.medium, angle },
-              long: { ...anchor.bars.long, angle }
-            }
-          };
-        })
-      };
-      return { arch, score: scoreTotal(arch) };
     }),
   removeAnchor: (id) =>
     set((state) => {
