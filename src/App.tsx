@@ -1,4 +1,5 @@
 import { usePlannerStore } from './state/usePlannerStore';
+import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
 import type { Anchor, BarType } from './domain/models';
 
 const scoreLabels: Record<keyof Omit<ReturnType<typeof usePlannerStore.getState>['score'], 'total'>, string> = {
@@ -15,21 +16,26 @@ function App() {
     arch,
     score,
     setRandomSeed,
+    rerollArch,
     setBarLength,
     addAnchor,
     removeAnchor,
     toggleAnchor
   } = usePlannerStore();
 
+  const archPath = toArchPath(arch.contour);
+  const innerCenter = arch.innerCenter.x === 0 && arch.innerCenter.y === 0 ? calcInnerCenterFromPoints(arch.contour) : arch.innerCenter;
+
   return (
     <div className="layout">
       <section className="panel canvas-panel">
         <h2>牙弓画布区</h2>
         <svg viewBox={`0 0 ${arch.width} ${arch.height}`} className="arch-canvas" role="img" aria-label="dental arch canvas">
-          <path
-            d={`M 80 ${arch.height - 70} Q ${arch.width / 2} 40 ${arch.width - 80} ${arch.height - 70}`}
-            className="arch-path"
-          />
+          <path d={archPath} className="arch-path" />
+          <circle cx={innerCenter.x} cy={innerCenter.y} r={7} className="inner-center" />
+          <text x={innerCenter.x} y={innerCenter.y - 12} textAnchor="middle" className="inner-center-label">
+            内侧中心
+          </text>
           {arch.anchors.map((anchor: Anchor) => (
             <g key={anchor.id} onClick={() => toggleAnchor(anchor.id)} className="anchor-group">
               <circle cx={anchor.x} cy={anchor.y} r={anchor.active ? 12 : 10} className={anchor.active ? 'anchor active' : 'anchor'} />
@@ -61,6 +67,7 @@ function App() {
           </label>
         ))}
         <div className="actions">
+          <button type="button" onClick={rerollArch}>重新随机生成</button>
           <button type="button" onClick={addAnchor}>添加 Anchor</button>
           <button
             type="button"

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Anchor, BarType, DentalArch, ScoreBreakdown } from '../domain/models';
+import { generateArchCurve } from '../domain/archGenerator';
+import type { Anchor, ArchPoint, BarType, DentalArch, ScoreBreakdown } from '../domain/models';
 
 interface PlannerState {
   randomSeed: number;
@@ -7,6 +8,7 @@ interface PlannerState {
   arch: DentalArch;
   score: ScoreBreakdown;
   setRandomSeed: (seed: number) => void;
+  rerollArch: () => void;
   setBarLength: (type: BarType, length: number) => void;
   addAnchor: () => void;
   removeAnchor: (id: string) => void;
@@ -25,17 +27,28 @@ const calcScore = (arch: DentalArch): ScoreBreakdown => {
   return { cohesion, compactness, collision, balance, total };
 };
 
-const makeAnchor = (id: number, width: number, height: number, barLengths: Record<BarType, number>): Anchor => ({
-  id: `A-${id}`,
-  x: 120 + (id * 53) % (width - 240),
-  y: 90 + (id * 31) % (height - 160),
-  active: true,
-  bars: {
-    short: { type: 'short', length: barLengths.short },
-    medium: { type: 'medium', length: barLengths.medium },
-    long: { type: 'long', length: barLengths.long }
-  }
-});
+const makeAnchor = (
+  id: number,
+  fallbackWidth: number,
+  fallbackHeight: number,
+  barLengths: Record<BarType, number>,
+  contour: ArchPoint[]
+): Anchor => {
+  const contourIndex = Math.max(0, Math.min(contour.length - 1, Math.round((id / 7) * contour.length)));
+  const curvePoint = contour[contourIndex];
+
+  return {
+    id: `A-${id}`,
+    x: curvePoint?.x ?? 120 + (id * 53) % (fallbackWidth - 240),
+    y: curvePoint ? curvePoint.y + 44 : 90 + (id * 31) % (fallbackHeight - 160),
+    active: true,
+    bars: {
+      short: { type: 'short', length: barLengths.short },
+      medium: { type: 'medium', length: barLengths.medium },
+      long: { type: 'long', length: barLengths.long }
+    }
+  };
+};
 
 const initialBarLengths: Record<BarType, number> = {
   short: 8,
@@ -43,18 +56,43 @@ const initialBarLengths: Record<BarType, number> = {
   long: 16
 };
 
-const initialArch: DentalArch = {
-  width: 720,
-  height: 360,
-  anchors: [1, 2, 3, 4, 5].map((id) => makeAnchor(id, 720, 360, initialBarLengths))
+const buildArch = (
+  seed: number,
+  barLengths: Record<BarType, number>,
+  width = 720,
+  height = 360,
+  anchorCount = 5
+): DentalArch => {
+  const curve = generateArchCurve({ width, height, seed, segmentCount: 64 });
+
+  return {
+    width,
+    height,
+    contour: curve.outerPoints,
+    innerCenter: curve.innerCenter,
+    anchors: Array.from({ length: anchorCount }, (_, idx) => makeAnchor(idx + 1, width, height, barLengths, curve.outerPoints))
+  };
 };
 
+const initialSeed = 42;
+const initialArch: DentalArch = buildArch(initialSeed, initialBarLengths);
+
 export const usePlannerStore = create<PlannerState>((set) => ({
-  randomSeed: 42,
+  randomSeed: initialSeed,
   barLengths: initialBarLengths,
   arch: initialArch,
   score: calcScore(initialArch),
-  setRandomSeed: (seed) => set({ randomSeed: seed }),
+  setRandomSeed: (seed) =>
+    set((state) => {
+      const arch = buildArch(seed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
+      return { randomSeed: seed, arch, score: calcScore(arch) };
+    }),
+  rerollArch: () =>
+    set((state) => {
+      const nextSeed = state.randomSeed + 1;
+      const arch = buildArch(nextSeed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
+      return { randomSeed: nextSeed, arch, score: calcScore(arch) };
+    }),
   setBarLength: (type, length) =>
     set((state) => {
       const barLengths = { ...state.barLengths, [type]: length };
@@ -73,7 +111,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   addAnchor: () =>
     set((state) => {
       const nextId = state.arch.anchors.length + 1;
-      const newAnchor = makeAnchor(nextId, state.arch.width, state.arch.height, state.barLengths);
+      const newAnchor = makeAnchor(nextId, state.arch.width, state.arch.height, state.barLengths, state.arch.contour);
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
       return { arch, score: calcScore(arch) };
     }),
