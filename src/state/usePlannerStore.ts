@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { generateArchCurve } from '../domain/archGenerator';
-import { BAR_TYPES, getPlacementAngle } from '../domain/placement';
-import type { Anchor, ArchPoint, BarType, DentalArch, ScoreBreakdown } from '../domain/models';
+import { getPlacementAngle } from '../domain/placement';
+import { scoreTotal } from '../domain/scoring';
+import type { Anchor, ArchPoint, BarType, DentalArch } from '../domain/models';
+import type { ScoreResult } from '../domain/types';
 
 interface PlannerState {
   randomSeed: number;
   barLengths: Record<BarType, number>;
   arch: DentalArch;
-  score: ScoreBreakdown;
+  score: ScoreResult;
   selectedAnchorId: string | null;
   setRandomSeed: (seed: number) => void;
   rerollArch: () => void;
@@ -18,21 +20,6 @@ interface PlannerState {
   placeBar: (anchorId: string, type: BarType) => void;
   setBarAngle: (anchorId: string, type: BarType, angle: number) => void;
 }
-
-const calcScore = (arch: DentalArch): ScoreBreakdown => {
-  const count = arch.anchors.length;
-  const placed = arch.anchors.reduce(
-    (total, anchor) => total + BAR_TYPES.filter((type) => anchor.bars[type].placed).length,
-    0
-  );
-  const cohesion = Math.min(100, placed * 8);
-  const compactness = Math.max(0, 100 - count * 4);
-  const collision = Math.max(0, 100 - Math.max(0, count - 10) * 10);
-  const balance = Math.max(0, 100 - Math.abs(placed - (count * BAR_TYPES.length - placed)) * 4);
-  const total = Math.round((cohesion + compactness + collision + balance) / 4);
-
-  return { cohesion, compactness, collision, balance, total };
-};
 
 const makeAnchor = (
   id: number,
@@ -95,17 +82,17 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   barLengths: initialBarLengths,
   arch: initialArch,
   selectedAnchorId: initialArch.anchors[0]?.id ?? null,
-  score: calcScore(initialArch),
+  score: scoreTotal(initialArch),
   setRandomSeed: (seed) =>
     set((state) => {
       const arch = buildArch(seed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
-      return { randomSeed: seed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: calcScore(arch) };
+      return { randomSeed: seed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: scoreTotal(arch) };
     }),
   rerollArch: () =>
     set((state) => {
       const nextSeed = state.randomSeed + 1;
       const arch = buildArch(nextSeed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
-      return { randomSeed: nextSeed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: calcScore(arch) };
+      return { randomSeed: nextSeed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: scoreTotal(arch) };
     }),
   setBarLength: (type, length) =>
     set((state) => {
@@ -120,7 +107,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
           }
         }))
       };
-      return { barLengths, arch, score: calcScore(arch) };
+      return { barLengths, arch, score: scoreTotal(arch) };
     }),
   addAnchor: () =>
     set((state) => {
@@ -134,7 +121,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         state.arch.innerCenter
       );
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
-      return { arch, selectedAnchorId: newAnchor.id, score: calcScore(arch) };
+      return { arch, selectedAnchorId: newAnchor.id, score: scoreTotal(arch) };
     }),
   removeAnchor: (id) =>
     set((state) => {
@@ -145,7 +132,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
       };
       const selectedAnchorId =
         state.selectedAnchorId === id ? (nextAnchors[0]?.id ?? null) : state.selectedAnchorId;
-      return { arch, selectedAnchorId, score: calcScore(arch) };
+      return { arch, selectedAnchorId, score: scoreTotal(arch) };
     }),
   selectAnchor: (id) => set(() => ({ selectedAnchorId: id })),
   placeBar: (anchorId, type) =>
@@ -171,7 +158,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         })
       };
 
-      return { arch, score: calcScore(arch) };
+      return { arch, score: scoreTotal(arch) };
     }),
   setBarAngle: (anchorId, type, angle) =>
     set((state) => {
@@ -195,6 +182,6 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         })
       };
 
-      return { arch };
+      return { arch, score: scoreTotal(arch) };
     })
 }));

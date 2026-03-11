@@ -5,8 +5,8 @@ import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
 import { getBarRect } from './render/barRenderer';
 import type { Anchor, BarType } from './domain/models';
 
-const scoreLabels: Record<keyof Omit<ReturnType<typeof usePlannerStore.getState>['score'], 'total'>, string> = {
-  cohesion: '聚拢',
+const scoreLabels: Record<'convergence' | 'compactness' | 'collision' | 'balance', string> = {
+  convergence: '聚拢',
   compactness: '紧凑',
   collision: '碰撞',
   balance: '平衡'
