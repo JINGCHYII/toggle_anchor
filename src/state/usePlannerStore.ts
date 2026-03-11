@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { generateArchCurve } from '../domain/archGenerator';
+import { BAR_TYPES, getPlacementAngle } from '../domain/placement';
 import type { Anchor, ArchPoint, BarType, DentalArch, ScoreBreakdown } from '../domain/models';
 
 interface PlannerState {
@@ -7,21 +8,27 @@ interface PlannerState {
   barLengths: Record<BarType, number>;
   arch: DentalArch;
   score: ScoreBreakdown;
+  selectedAnchorId: string | null;
   setRandomSeed: (seed: number) => void;
   rerollArch: () => void;
   setBarLength: (type: BarType, length: number) => void;
   addAnchor: () => void;
   removeAnchor: (id: string) => void;
-  toggleAnchor: (id: string) => void;
+  selectAnchor: (id: string) => void;
+  placeBar: (anchorId: string, type: BarType) => void;
+  setBarAngle: (anchorId: string, type: BarType, angle: number) => void;
 }
 
 const calcScore = (arch: DentalArch): ScoreBreakdown => {
   const count = arch.anchors.length;
-  const active = arch.anchors.filter((a) => a.active).length;
-  const cohesion = Math.min(100, active * 8);
+  const placed = arch.anchors.reduce(
+    (total, anchor) => total + BAR_TYPES.filter((type) => anchor.bars[type].placed).length,
+    0
+  );
+  const cohesion = Math.min(100, placed * 8);
   const compactness = Math.max(0, 100 - count * 4);
   const collision = Math.max(0, 100 - Math.max(0, count - 10) * 10);
-  const balance = Math.max(0, 100 - Math.abs(active - (count - active)) * 6);
+  const balance = Math.max(0, 100 - Math.abs(placed - (count * BAR_TYPES.length - placed)) * 4);
   const total = Math.round((cohesion + compactness + collision + balance) / 4);
 
   return { cohesion, compactness, collision, balance, total };
@@ -32,20 +39,24 @@ const makeAnchor = (
   fallbackWidth: number,
   fallbackHeight: number,
   barLengths: Record<BarType, number>,
-  contour: ArchPoint[]
+  contour: ArchPoint[],
+  innerCenter: ArchPoint
 ): Anchor => {
   const contourIndex = Math.max(0, Math.min(contour.length - 1, Math.round((id / 7) * contour.length)));
   const curvePoint = contour[contourIndex];
 
+  const x = curvePoint?.x ?? 120 + (id * 53) % (fallbackWidth - 240);
+  const y = curvePoint ? curvePoint.y + 44 : 90 + (id * 31) % (fallbackHeight - 160);
+  const placementAngle = getPlacementAngle({ x, y }, innerCenter);
+
   return {
     id: `A-${id}`,
-    x: curvePoint?.x ?? 120 + (id * 53) % (fallbackWidth - 240),
-    y: curvePoint ? curvePoint.y + 44 : 90 + (id * 31) % (fallbackHeight - 160),
-    active: true,
+    x,
+    y,
     bars: {
-      short: { type: 'short', length: barLengths.short },
-      medium: { type: 'medium', length: barLengths.medium },
-      long: { type: 'long', length: barLengths.long }
+      short: { type: 'short', length: barLengths.short, placed: false, angle: placementAngle },
+      medium: { type: 'medium', length: barLengths.medium, placed: false, angle: placementAngle },
+      long: { type: 'long', length: barLengths.long, placed: false, angle: placementAngle }
     }
   };
 };
@@ -70,7 +81,9 @@ const buildArch = (
     height,
     contour: curve.outerPoints,
     innerCenter: curve.innerCenter,
-    anchors: Array.from({ length: anchorCount }, (_, idx) => makeAnchor(idx + 1, width, height, barLengths, curve.outerPoints))
+    anchors: Array.from({ length: anchorCount }, (_, idx) =>
+      makeAnchor(idx + 1, width, height, barLengths, curve.outerPoints, curve.innerCenter)
+    )
   };
 };
 
@@ -81,17 +94,18 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   randomSeed: initialSeed,
   barLengths: initialBarLengths,
   arch: initialArch,
+  selectedAnchorId: initialArch.anchors[0]?.id ?? null,
   score: calcScore(initialArch),
   setRandomSeed: (seed) =>
     set((state) => {
       const arch = buildArch(seed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
-      return { randomSeed: seed, arch, score: calcScore(arch) };
+      return { randomSeed: seed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: calcScore(arch) };
     }),
   rerollArch: () =>
     set((state) => {
       const nextSeed = state.randomSeed + 1;
       const arch = buildArch(nextSeed, state.barLengths, state.arch.width, state.arch.height, state.arch.anchors.length);
-      return { randomSeed: nextSeed, arch, score: calcScore(arch) };
+      return { randomSeed: nextSeed, arch, selectedAnchorId: arch.anchors[0]?.id ?? null, score: calcScore(arch) };
     }),
   setBarLength: (type, length) =>
     set((state) => {
@@ -111,26 +125,76 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   addAnchor: () =>
     set((state) => {
       const nextId = state.arch.anchors.length + 1;
-      const newAnchor = makeAnchor(nextId, state.arch.width, state.arch.height, state.barLengths, state.arch.contour);
+      const newAnchor = makeAnchor(
+        nextId,
+        state.arch.width,
+        state.arch.height,
+        state.barLengths,
+        state.arch.contour,
+        state.arch.innerCenter
+      );
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
-      return { arch, score: calcScore(arch) };
+      return { arch, selectedAnchorId: newAnchor.id, score: calcScore(arch) };
     }),
   removeAnchor: (id) =>
     set((state) => {
+      const nextAnchors = state.arch.anchors.filter((anchor) => anchor.id !== id);
       const arch = {
         ...state.arch,
-        anchors: state.arch.anchors.filter((anchor) => anchor.id !== id)
+        anchors: nextAnchors
       };
-      return { arch, score: calcScore(arch) };
+      const selectedAnchorId =
+        state.selectedAnchorId === id ? (nextAnchors[0]?.id ?? null) : state.selectedAnchorId;
+      return { arch, selectedAnchorId, score: calcScore(arch) };
     }),
-  toggleAnchor: (id) =>
+  selectAnchor: (id) => set(() => ({ selectedAnchorId: id })),
+  placeBar: (anchorId, type) =>
     set((state) => {
       const arch = {
         ...state.arch,
-        anchors: state.arch.anchors.map((anchor) =>
-          anchor.id === id ? { ...anchor, active: !anchor.active } : anchor
-        )
+        anchors: state.arch.anchors.map((anchor) => {
+          if (anchor.id !== anchorId) {
+            return anchor;
+          }
+
+          return {
+            ...anchor,
+            bars: {
+              ...anchor.bars,
+              [type]: {
+                ...anchor.bars[type],
+                placed: true,
+                angle: getPlacementAngle(anchor, state.arch.innerCenter)
+              }
+            }
+          };
+        })
       };
+
       return { arch, score: calcScore(arch) };
+    }),
+  setBarAngle: (anchorId, type, angle) =>
+    set((state) => {
+      const arch = {
+        ...state.arch,
+        anchors: state.arch.anchors.map((anchor) => {
+          if (anchor.id !== anchorId) {
+            return anchor;
+          }
+
+          return {
+            ...anchor,
+            bars: {
+              ...anchor.bars,
+              [type]: {
+                ...anchor.bars[type],
+                angle
+              }
+            }
+          };
+        })
+      };
+
+      return { arch };
     })
 }));
