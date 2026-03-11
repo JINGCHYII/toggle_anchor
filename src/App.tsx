@@ -1,9 +1,10 @@
 import { useState, type PointerEventHandler, type MouseEventHandler } from 'react';
 import { usePlannerStore } from './state/usePlannerStore';
 import { BAR_TYPES, getDragAngle } from './domain/placement';
+import type { Anchor, BarType } from './domain/models';
 import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
 import { getBarRect } from './render/barRenderer';
-import type { Anchor, BarType } from './domain/models';
+import { usePlannerStore } from './state/usePlannerStore';
 
 const scoreLabels: Record<'convergence' | 'compactness' | 'collision' | 'balance', string> = {
   convergence: '聚拢',
@@ -17,11 +18,13 @@ function App() {
     randomSeed,
     barLengths,
     arch,
+    cubic,
     score,
     selectedAnchorId,
     setRandomSeed,
     rerollArch,
     setBarLength,
+    setCubicCoefficient,
     addAnchor,
     addAnchorAtPoint,
     removeAnchor,
@@ -30,10 +33,20 @@ function App() {
     setBarAngle
   } = usePlannerStore();
 
-  const [dragging, setDragging] = useState<{ anchorId: string; type: BarType } | null>(null);
+  const [draggingBar, setDraggingBar] = useState<{ anchorId: string; type: BarType } | null>(null);
+  const [draggingAnchorId, setDraggingAnchorId] = useState<string | null>(null);
 
   const archPath = toArchPath(arch.contour);
-  const innerCenter = arch.innerCenter.x === 0 && arch.innerCenter.y === 0 ? calcInnerCenterFromPoints(arch.contour) : arch.innerCenter;
+  const innerCenter =
+    arch.innerCenter.x === 0 && arch.innerCenter.y === 0 ? calcInnerCenterFromPoints(arch.contour) : arch.innerCenter;
+
+  const mapEventToCanvas = (event: { clientX: number; clientY: number }, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * arch.width,
+      y: ((event.clientY - rect.top) / rect.height) * arch.height
+    };
+  };
 
   const mapEventToCanvas = (event: { clientX: number; clientY: number }, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
@@ -44,7 +57,14 @@ function App() {
   };
 
   const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
-    if (!dragging) {
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
+
+    if (draggingBar) {
+      const anchor = arch.anchors.find((item) => item.id === draggingBar.anchorId);
+      if (!anchor) {
+        return;
+      }
+      setBarAngle(anchor.id, draggingBar.type, getDragAngle(anchor, { x, y }));
       return;
     }
     const { x, y } = mapEventToCanvas(event, event.currentTarget);
@@ -52,7 +72,17 @@ function App() {
     if (!anchor) {
       return;
     }
-    setBarAngle(anchor.id, dragging.type, getDragAngle(anchor, { x, y }));
+    const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
+    if (clickedAnchor) {
+      return;
+    }
+    const { x, y } = mapEventToCanvas(event, event.currentTarget);
+    addAnchorAtPoint(x, y);
+  };
+
+  const stopDragging = () => {
+    setDraggingBar(null);
+    setDraggingAnchorId(null);
   };
 
   const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
@@ -78,8 +108,8 @@ function App() {
           aria-label="dental arch canvas"
           onClick={handleCanvasClick}
           onPointerMove={handlePointerMove}
-          onPointerUp={() => setDragging(null)}
-          onPointerLeave={() => setDragging(null)}
+          onPointerUp={stopDragging}
+          onPointerLeave={stopDragging}
         >
           <path d={archPath} className="arch-path" />
           <circle cx={innerCenter.x} cy={innerCenter.y} r={7} className="inner-center" />
@@ -105,7 +135,7 @@ function App() {
                     transform={`rotate(${rect.angleDeg} ${anchor.x} ${anchor.y})`}
                     onPointerDown={(event) => {
                       event.stopPropagation();
-                      setDragging({ anchorId: anchor.id, type });
+                      setDraggingBar({ anchorId: anchor.id, type });
                     }}
                   />
                 );
@@ -144,6 +174,21 @@ function App() {
           随机种子
           <input type="number" value={randomSeed} onChange={(e) => setRandomSeed(Number(e.target.value))} />
         </label>
+
+        {(['a', 'b', 'c', 'd'] as const).map((key) => (
+          <label key={key}>
+            {key} = {cubic[key].toFixed(5)}
+            <input
+              type="range"
+              min={CUBIC_RANGES[key].min}
+              max={CUBIC_RANGES[key].max}
+              step={key === 'a' ? 0.00001 : key === 'b' ? 0.0001 : 0.0001}
+              value={cubic[key]}
+              onChange={(event) => setCubicCoefficient(key, Number(event.target.value))}
+            />
+          </label>
+        ))}
+
         {(['short', 'medium', 'long'] as BarType[]).map((type) => (
           <label key={type}>
             {type} 扫描杆长度(mm)
@@ -156,6 +201,7 @@ function App() {
             />
           </label>
         ))}
+
         <div className="actions place-actions">
           {(BAR_TYPES as BarType[]).map((type) => (
             <button
@@ -172,9 +218,14 @@ function App() {
             </button>
           ))}
         </div>
+
         <div className="actions">
-          <button type="button" onClick={rerollArch}>重新随机生成</button>
-          <button type="button" onClick={addAnchor}>添加 Anchor</button>
+          <button type="button" onClick={rerollArch}>
+            重新随机生成
+          </button>
+          <button type="button" onClick={addAnchor}>
+            添加 Anchor
+          </button>
           <button
             type="button"
             onClick={() => {

@@ -55,7 +55,6 @@ body {
   fill: #bfc8e8;
   stroke: #4f5da3;
   stroke-width: 2;
-  cursor: pointer;
 }
 
 .anchor.active {
@@ -70,7 +69,8 @@ body {
   rx: 2;
 }
 
-.bar:active {
+.bar:active,
+.anchor-group:active {
   cursor: grabbing;
 }
 
@@ -90,6 +90,10 @@ label {
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+input[type='range'] {
+  width: 100%;
 }
 
 .actions {
