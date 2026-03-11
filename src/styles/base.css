@@ -1,0 +1,89 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  color: #1b1b1b;
+  background: #f4f6fb;
+}
+
+body {
+  margin: 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+}
+
+.arch-canvas {
+  width: 100%;
+  height: 360px;
+  background: linear-gradient(#fdfdff, #eff4ff);
+  border-radius: 10px;
+}
+
+.arch-path {
+  fill: none;
+  stroke: #6079d8;
+  stroke-width: 6;
+}
+
+.anchor {
+  fill: #bfc8e8;
+  stroke: #4f5da3;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.anchor.active {
+  fill: #5f7dff;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #5f7dff;
+  color: #fff;
+}
+
+button:disabled {
+  background: #9ea4bd;
+}
+
+.score-panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.score-panel li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf0f8;
+}
+
+.total {
+  margin-top: 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
