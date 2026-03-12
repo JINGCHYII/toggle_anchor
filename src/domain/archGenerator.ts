@@ -27,7 +27,7 @@ const MAX_DEPTH_MM = 40;
 
 export const CUBIC_RANGES = {
   a: { min: 0.00005, max: 0.0003 },
-  b: { min: 0.01, max: 0.02 },
+  b: { min: 0.1, max: 1 },
   c: { min: -0.001, max: 0.001 },
   d: { min: -0.5, max: 0.5 }
 };
@@ -40,7 +40,6 @@ const createSeededRng = (seed: number) => {
   };
 };
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export const mmXToCanvasX = (xMm: number, width: number) => {
   const centerX = width / 2;
@@ -54,10 +53,8 @@ export const canvasXToMmX = (xCanvas: number, width: number) => {
   return (xCanvas - centerX) * canvasToMmX;
 };
 
-export const evaluateCubicDepthMm = (coefficients: CubicCoefficients, xMm: number) => {
-  const rawDepth = coefficients.a * xMm ** 3 + coefficients.b * xMm ** 2 + coefficients.c * xMm + coefficients.d;
-  return clamp(rawDepth, 0, MAX_DEPTH_MM);
-};
+export const evaluateCubicDepthMm = (coefficients: CubicCoefficients, xMm: number) =>
+  coefficients.a * xMm ** 3 + coefficients.b * xMm ** 2 + coefficients.c * xMm + coefficients.d;
 
 const calcInnerCenter = (points: ArchPoint[], height: number): ArchPoint => {
   const geometricCenter = points.reduce(

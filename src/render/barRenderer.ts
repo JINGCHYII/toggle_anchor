@@ -10,7 +10,7 @@ export interface BarRect {
 }
 
 export const getBarRect = (anchor: Pick<Anchor, 'x' | 'y'>, bar: Pick<ScanBar, 'length' | 'angle'>): BarRect => {
-  const width = bar.length;
+  const width = bar.length * 10;
   const height = BAR_WIDTH;
   const x = anchor.x;
   const y = anchor.y - height / 2;

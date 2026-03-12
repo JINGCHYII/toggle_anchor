@@ -1,4 +1,4 @@
-import { useState, type MouseEventHandler, type PointerEventHandler } from 'react';
+import { useRef, useState, type MouseEventHandler, type PointerEventHandler } from 'react';
 import { CUBIC_RANGES } from './domain/archGenerator';
 import type { Anchor, BarType } from './domain/models';
 import { BAR_TYPES, getDragAngle } from './domain/placement';
@@ -34,6 +34,8 @@ function App() {
   } = usePlannerStore();
 
   const [draggingBar, setDraggingBar] = useState<{ anchorId: string; type: BarType } | null>(null);
+  const movedWhileDraggingRef = useRef(false);
+  const suppressNextCanvasClickRef = useRef(false);
 
   const archPath = toArchPath(arch.contour);
   const innerCenter =
@@ -58,19 +60,29 @@ function App() {
       return;
     }
 
+    movedWhileDraggingRef.current = true;
     setBarAngle(anchor.id, draggingBar.type, getDragAngle(anchor, { x, y }));
   };
 
   const stopDragging = () => {
+    if (draggingBar && movedWhileDraggingRef.current) {
+      suppressNextCanvasClickRef.current = true;
+    }
     setDraggingBar(null);
+    movedWhileDraggingRef.current = false;
   };
 
   const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
-    if (draggingBar) {
+    if (draggingBar || suppressNextCanvasClickRef.current) {
+      suppressNextCanvasClickRef.current = false;
       return;
     }
-    const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
+    const target = event.target as HTMLElement;
+    const clickedAnchor = target.closest('[data-anchor-id]');
     if (clickedAnchor) {
+      return;
+    }
+    if (!target.closest('.arch-path')) {
       return;
     }
     const { x, y } = mapEventToCanvas(event, event.currentTarget);
@@ -115,6 +127,7 @@ function App() {
                     transform={`rotate(${rect.angleDeg} ${anchor.x} ${anchor.y})`}
                     onPointerDown={(event) => {
                       event.stopPropagation();
+                      movedWhileDraggingRef.current = false;
                       setDraggingBar({ anchorId: anchor.id, type });
                     }}
                   />
@@ -215,7 +228,7 @@ function App() {
             删除选中 Anchor
           </button>
         </div>
-        <p className="tips">点击曲线或画布可添加点；双击已添加点可删除。</p>
+        <p className="tips">仅可点击曲线添加点；双击已添加点可删除。</p>
       </section>
 
       <section className="panel score-panel">
