@@ -1,7 +1,7 @@
-import { useState, type PointerEventHandler, type MouseEventHandler } from 'react';
-import { usePlannerStore } from './state/usePlannerStore';
-import { BAR_TYPES, getDragAngle } from './domain/placement';
+import { useState, type MouseEventHandler, type PointerEventHandler } from 'react';
+import { CUBIC_RANGES } from './domain/archGenerator';
 import type { Anchor, BarType } from './domain/models';
+import { BAR_TYPES, getDragAngle } from './domain/placement';
 import { calcInnerCenterFromPoints, toArchPath } from './render/archRenderer';
 import { getBarRect } from './render/barRenderer';
 import { usePlannerStore } from './state/usePlannerStore';
@@ -34,7 +34,6 @@ function App() {
   } = usePlannerStore();
 
   const [draggingBar, setDraggingBar] = useState<{ anchorId: string; type: BarType } | null>(null);
-  const [draggingAnchorId, setDraggingAnchorId] = useState<string | null>(null);
 
   const archPath = toArchPath(arch.contour);
   const innerCenter =
@@ -48,45 +47,26 @@ function App() {
     };
   };
 
-  const mapEventToCanvas = (event: { clientX: number; clientY: number }, svg: SVGSVGElement) => {
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * arch.width,
-      y: ((event.clientY - rect.top) / rect.height) * arch.height
-    };
-  };
-
   const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
-    const { x, y } = mapEventToCanvas(event, event.currentTarget);
-
-    if (draggingBar) {
-      const anchor = arch.anchors.find((item) => item.id === draggingBar.anchorId);
-      if (!anchor) {
-        return;
-      }
-      setBarAngle(anchor.id, draggingBar.type, getDragAngle(anchor, { x, y }));
+    if (!draggingBar) {
       return;
     }
+
     const { x, y } = mapEventToCanvas(event, event.currentTarget);
-    const anchor = arch.anchors.find((item) => item.id === dragging.anchorId);
+    const anchor = arch.anchors.find((item) => item.id === draggingBar.anchorId);
     if (!anchor) {
       return;
     }
-    const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
-    if (clickedAnchor) {
-      return;
-    }
-    const { x, y } = mapEventToCanvas(event, event.currentTarget);
-    addAnchorAtPoint(x, y);
+
+    setBarAngle(anchor.id, draggingBar.type, getDragAngle(anchor, { x, y }));
   };
 
   const stopDragging = () => {
     setDraggingBar(null);
-    setDraggingAnchorId(null);
   };
 
   const handleCanvasClick: MouseEventHandler<SVGSVGElement> = (event) => {
-    if (dragging) {
+    if (draggingBar) {
       return;
     }
     const clickedAnchor = (event.target as HTMLElement).closest('[data-anchor-id]');
@@ -141,7 +121,6 @@ function App() {
                 );
               })}
               <g
-                key={anchor.id}
                 data-anchor-id={anchor.id}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -182,7 +161,7 @@ function App() {
               type="range"
               min={CUBIC_RANGES[key].min}
               max={CUBIC_RANGES[key].max}
-              step={key === 'a' ? 0.00001 : key === 'b' ? 0.0001 : 0.0001}
+              step={key === 'a' ? 0.00001 : 0.0001}
               value={cubic[key]}
               onChange={(event) => setCubicCoefficient(key, Number(event.target.value))}
             />
