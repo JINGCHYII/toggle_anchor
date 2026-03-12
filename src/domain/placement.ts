@@ -1,6 +1,6 @@
 import type { Anchor, ArchPoint, BarType } from './models';
 
-export const BAR_WIDTH = 10;
+export const BAR_WIDTH = 9;
 
 export const getPlacementAngle = (anchor: Pick<Anchor, 'x' | 'y'>, center: ArchPoint): number => {
   const dx = center.x - anchor.x;

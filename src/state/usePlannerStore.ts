@@ -178,6 +178,11 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   addAnchorAtPoint: (x, y) =>
     set((state) => {
       const nextId = state.arch.anchors.length + 1;
+      const clampedPoint = {
+        x: Math.max(0, Math.min(state.arch.width, x)),
+        y: Math.max(0, Math.min(state.arch.height, y))
+      };
+      const snappedPoint = closestPointOnCurve(state.arch.contour, clampedPoint.x, clampedPoint.y);
       const newAnchor = makeAnchor(
         nextId,
         state.arch.width,
@@ -185,10 +190,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
         state.barLengths,
         state.arch.contour,
         state.arch.innerCenter,
-        {
-          x: Math.max(0, Math.min(state.arch.width, x)),
-          y: Math.max(0, Math.min(state.arch.height, y))
-        }
+        snappedPoint
       );
       const arch = { ...state.arch, anchors: [...state.arch.anchors, newAnchor] };
       return { arch, selectedAnchorId: newAnchor.id, score: scoreTotal(arch) };
